@@ -1,0 +1,219 @@
+from flask import Flask, request, render_template_string
+import random
+
+app = Flask(__name__)
+
+# game state
+secret_number = random.randint(1,100)
+attempts = 0
+game_over = False
+
+leaderboard = []
+
+HTML = """
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>AI Prediction Game</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:linear-gradient(135deg,#667eea,#764ba2);
+height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+color:#333;
+}
+
+.box{
+background:white;
+padding:40px;
+border-radius:15px;
+width:420px;
+text-align:center;
+box-shadow:0 15px 30px rgba(0,0,0,0.2);
+}
+
+h1{
+margin-bottom:10px;
+}
+
+input{
+padding:10px;
+font-size:18px;
+width:120px;
+border-radius:6px;
+border:1px solid #ccc;
+}
+
+button{
+padding:10px 20px;
+margin:8px;
+border:none;
+background:#667eea;
+color:white;
+border-radius:8px;
+cursor:pointer;
+}
+
+button:hover{
+background:#4c57d6;
+}
+
+.result{
+font-size:18px;
+margin-top:10px;
+}
+
+.hint{
+margin-top:8px;
+color:#444;
+font-style:italic;
+}
+
+table{
+width:100%;
+margin-top:15px;
+border-collapse:collapse;
+}
+
+th,td{
+border-bottom:1px solid #ddd;
+padding:6px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="box">
+
+<h1>🎮 AI Number Prediction</h1>
+<p>Guess number between <b>1 - 100</b></p>
+
+{% if not game_over %}
+
+<form method="POST">
+<input type="number" name="guess" min="1" max="100" required>
+<br>
+<button type="submit">Guess</button>
+</form>
+
+{% endif %}
+
+<div class="result">{{message}}</div>
+<div class="result">{{distance}}</div>
+<div class="hint">{{ai_hint}}</div>
+
+<p><b>Attempts:</b> {{attempts}}</p>
+
+{% if game_over %}
+
+<h2>🏆 Correct!</h2>
+
+<form method="POST">
+<button name="restart" value="1">🔄 Restart Game</button>
+</form>
+
+{% endif %}
+
+<h3>🏆 Leaderboard (Best Attempts)</h3>
+
+<table>
+<tr>
+<th>Rank</th>
+<th>Attempts</th>
+</tr>
+
+{% for score in leaderboard %}
+
+<tr>
+<td>{{loop.index}}</td>
+<td>{{score}}</td>
+</tr>
+
+{% endfor %}
+
+</table>
+
+</div>
+
+</body>
+</html>
+
+"""
+
+@app.route("/", methods=["GET","POST"])
+def home():
+    global secret_number, attempts, game_over, leaderboard
+
+    message=""
+    distance=""
+    ai_hint=""
+
+    if request.method=="POST":
+
+        # restart game
+        if "restart" in request.form:
+            secret_number=random.randint(1,100)
+            attempts=0
+            game_over=False
+
+        elif not game_over:
+
+            guess=int(request.form["guess"])
+            attempts+=1
+
+            diff=abs(secret_number-guess)
+
+            # correct guess
+            if guess==secret_number:
+
+                message=f"🎉 Correct! Number was {secret_number}"
+                distance=f"You solved it in {attempts} attempts"
+
+                leaderboard.append(attempts)
+                leaderboard=sorted(leaderboard)[:5]
+
+                game_over=True
+
+            else:
+
+                if guess>secret_number:
+                    message="📉 Too HIGH"
+                else:
+                    message="📈 Too LOW"
+
+                # distance feedback
+                if diff<=5:
+                    distance=f"🔥 HOT! Only {diff} away"
+                elif diff<=15:
+                    distance=f"🙂 Warm! {diff} away"
+                else:
+                    distance=f"❄️ Cold! {diff} away"
+
+                # AI hint
+                if guess>secret_number:
+                    ai_hint=f"🤖 AI Hint: Try a number LOWER than {guess}"
+                else:
+                    ai_hint=f"🤖 AI Hint: Try a number HIGHER than {guess}"
+
+    return render_template_string(
+        HTML,
+        message=message,
+        distance=distance,
+        ai_hint=ai_hint,
+        attempts=attempts,
+        leaderboard=leaderboard,
+        game_over=game_over
+    )
+
+
+if __name__=="__main__":
+    app.run(debug=True)
